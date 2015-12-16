@@ -109,7 +109,7 @@ class DV():
         for name in self.distance_vector.keys():
             print self.distance_vector[name]
 
-        print self.next_hop
+        print 'NEXT HOP: ' + str(self.next_hop)
         print ''.center(80, '-') + '\n'
 
     # this is the core program, which will compute the distance table.
@@ -124,21 +124,14 @@ class DV():
             if dest != self.host_name:
                 for mid,v in self.neighbors.items():
                     if v.link_status and mid !=self.host_name:
-                        # here is a fatal error that I use the dv ttable to modify the dv table.
+                        # fatal error here that I use the table to modify the table itself.
+                        # you should use the cost to your neighbors to compute the new table!!!
+                        # here is a fatal error that I use the dv table to modify the dv table.
                         d = self.neighbors[mid].weight + distance_vector[mid][dest]
                         # including d == inf.
                         if d <= min:
                             min = d
                             next_hop = mid
-
-                # RESET THE TABLE HERE IF THE MIN IS THE DIRECT EDGE BUT THE VALUE DOSEN'T MATCH
-                # if dest in self.neighbors.keys() and next_hop == dest and min != self.neighbors[dest].weight \
-                #         and (distance_vector[next_hopper[dest]][dest] == float('inf') or
-                #         distance_vector[dest][next_hopper[dest]] == float('inf')):
-                #     min = self.neighbors[dest].weight
-                #     distance_vector[self.host_name][dest] = self.neighbors[dest].weight
-                #     next_hop = dest
-
                 if min != cost:
                     if min != float('inf') and min > self.ceiling:
                         min = float('inf')
@@ -162,6 +155,9 @@ class DV():
         if link:
             # if recv the UPDATE info, the status will be restored.
             if not self.neighbors[client].link_status:
+                # DEBUG PRINCE!
+                # always restore timer before status.
+                self.neighbors[client].time = time.time()
                 self.neighbors[client].link_status = True
                 self.neighbors[client].weight = self.neighbors[client].origin
             # update the time.
@@ -191,6 +187,7 @@ class DV():
                     for k,v in tmp.items():
                         self.distance_vector[client][k] = v
         else:
+            print 'linkdown ' + client
             self.neighbors[client].link_status = False
             self.neighbors[client].weight = float('inf')
             # update the table here
@@ -234,15 +231,15 @@ class DV():
                     self.dv_update_flag = False
 
     # reset the table if one of neighbor is down.
-    def reset_dv_host(self, name):
-        for k, v in self.neighbors.items():
-            if k != name and v.link_status:
-                self.distance_vector[self.host_name][k] = self.neighbors[k].weight
-                # THIS IS VERY IMPORTANT DEBUG!!!!! YOU SHOULD RESET NEXT HOP HERE
-                # BECAUSE IN YOU BELLMAN FORD, YOU USE != TO DECIDE THE NEXT HOPPER
-                # SO IF YOU RESET THE FIRST ENTRY AND THIS ITEM ITSELF IS THE MIN, IT WON'T
-                # WRITE THE NEXT HOPPER INTO THE LIST.
-                self.next_hop[k] = k
+    # def reset_dv_host(self, name):
+    #     for k, v in self.neighbors.items():
+    #         if k != name and v.link_status:
+    #             self.distance_vector[self.host_name][k] = self.neighbors[k].weight
+    #             # THIS IS VERY IMPORTANT DEBUG!!!!! YOU SHOULD RESET NEXT HOP HERE
+    #             # BECAUSE IN YOU BELLMAN FORD, YOU USE != TO DECIDE THE NEXT HOPPER
+    #             # SO IF YOU RESET THE FIRST ENTRY AND THIS ITEM ITSELF IS THE MIN, IT WON'T
+    #             # WRITE THE NEXT HOPPER INTO THE LIST.
+    #             self.next_hop[k] = k
 
     def timer_(self):
         while True:
@@ -288,7 +285,7 @@ class DV():
                 except socket.error, e:
                     print 'ERROR{0}: {1}'.format(e[0], e[1])
                     sys.exit('link_down socket error')
-                print '>>> LINK DOWN ' + client
+                print self.host_name + '>>> LINK DOWN ' + client
                 self.neighbors[client].link_status = False
                 self.neighbors[client].weight = float('inf')
                 # update and send out the distance vector
@@ -318,9 +315,18 @@ class DV():
                         print 'LINK UP ALREADY.'
                         return
                     else:
-                        print '>>> LINK UP ' + client
+                        print self.host_name + '>>> LINK UP ' + client
                         cl = self.neighbors[client]
                         # reset the link status.
+                        # here you should reset the time here, because when you set true, but the time is old time
+                        # will lead to 3 * time out.
+
+                        # you should set the timer first because right after you set true, the timer will use the
+                        # old time to set it False again, see timer.
+
+                        # DEBUG PRINCE!!!!!!!!!!!
+
+                        cl.time = time.time()
                         cl.link_status = True
                         cl.weight = cl.origin
                         # reset client to it self.
@@ -331,9 +337,15 @@ class DV():
                             else:
                                 self.distance_vector[client][k] = 0
                         self.dv_update_flag = self.bellman_ford()
+
+                        # CHECK THE SEND LIST.
+                        # for k,v in self.neighbors.items():
+                        #     if v.link_status and k != self.host_name:
+                        #         print k
                         try:
-                            self.conn.sendto('LINK UP' + json.dumps(self.distance_vector[self.host_name]),
-                                             (addr[0], int(addr[1])))
+                            if not self.dv_update_flag:
+                                self.conn.sendto('LINK UP' + json.dumps(self.distance_vector[self.host_name]),
+                                                (addr[0], int(addr[1])))
                         except ValueError, e:
                             print e
                             sys.exit('link up exception.')
