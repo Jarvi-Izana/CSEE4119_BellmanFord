@@ -1,5 +1,5 @@
 # 1 DESCRIPTION OF THE CODE
-TO BELOVED XIAOXUE XIAO.
+T               ————致挚爱的肖晓雪
 ## class neighbor:
 ### MAIN VARIABLE
 * link_status: *boolean* decide whether the target router is open.
