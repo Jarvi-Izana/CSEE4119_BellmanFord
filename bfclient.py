@@ -19,6 +19,7 @@ class Neighbor():
         self.weight = weight
         self.origin = weight
         self.link_status = True
+        self.link_down = False
         self.name = ':'.join((self._addr, str(self._port)))
         self.time = time.time()
 
@@ -154,7 +155,12 @@ class DV():
         # update the dv table.
         if link:
             # if recv the UPDATE info, the status will be restored.
-            if not self.neighbors[client].link_status:
+            # link_down is different status from link_status.
+            # link_status is used to determine whether the router is log out or not,
+            # a router can be still alive but link down the link.
+            # so I add link_down to avoid that if in link_down(), the link_status is set false,
+            # while at the same time, the link down target send update msg to restore its link_status back.
+            if not self.neighbors[client].link_status and not self.neighbors[client].link_down:
                 # DEBUG PRINCE!
                 # always restore timer before status.
                 self.neighbors[client].time = time.time()
@@ -285,7 +291,8 @@ class DV():
                 except socket.error, e:
                     print 'ERROR{0}: {1}'.format(e[0], e[1])
                     sys.exit('link_down socket error')
-                print self.host_name + '>>> LINK DOWN ' + client
+                print self.host_name + '>>> LINK DOWN ' + client + '\n'
+                self.neighbors[client].link_down = True
                 self.neighbors[client].link_status = False
                 self.neighbors[client].weight = float('inf')
                 # update and send out the distance vector
@@ -315,7 +322,7 @@ class DV():
                         print 'LINK UP ALREADY.'
                         return
                     else:
-                        print self.host_name + '>>> LINK UP ' + client
+                        print self.host_name + '>>> LINK UP ' + client + '\n'
                         cl = self.neighbors[client]
                         # reset the link status.
                         # here you should reset the time here, because when you set true, but the time is old time
@@ -327,6 +334,7 @@ class DV():
                         # DEBUG PRINCE!!!!!!!!!!!
 
                         cl.time = time.time()
+                        cl.link_down = True
                         cl.link_status = True
                         cl.weight = cl.origin
                         # reset client to it self.
@@ -395,12 +403,25 @@ class DV():
                 self.link_up(cmd[1])
             elif cmd[0] == 'LINKDOWN' and length == 2:
                 self.link_down(cmd[1])
-            elif cmd[0] == 'FG' and length == 1:
-                print 'update: {}, timer: {}'.format(self.dv_update_flag, self.timer_due)
+            elif cmd[0] == 'ST' and length == 1:
+                print 'DV_update: {}, timer: {}\n'.format(self.dv_update_flag, self.timer_due)
             elif cmd[0] == '':
                 continue
             elif cmd[0].startswith('TA'):
                 self.print_table()
+            elif cmd[0] == 'MAG' and length == 2:
+                try:
+                    mag = float(cmd[1])
+                except TypeError:
+                    print 'MAG SHOULD BE FLOAT TYPE.\n'
+                except ValueError:
+                    print 'REDUNDANT INPUT VALUE.\n'
+                else:
+                    if mag <= 0:
+                        print 'mag SHOULD BE POSITIVE.\n'
+                    else:
+                        self.ceiling = mag * max([v.weight for v in self.neighbors.values()])
+                        print 'The ceiling is reset: ' + str(self.ceiling) + '\n'
             else:
                 print 'cmd error, pls input again.'
 
