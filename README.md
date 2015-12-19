@@ -1,4 +1,5 @@
 # 1 DESCRIPTION OF THE CODE
+TO BELOVED XIAOXUE XIAO.
 ## class neighbor:
 ### MAIN VARIABLE
 * link_status: *boolean* decide whether the target router is open.
