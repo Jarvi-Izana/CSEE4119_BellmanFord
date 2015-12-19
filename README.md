@@ -1,5 +1,6 @@
-# 1 DESCRIPTION OF THE CODE
-T               ————致挚爱的肖晓雪
+# 1 DESCRIPTION OF THE CODE 
+####致挚爱的肖晓雪, 19/12/2015
+####短暂的相遇,却念念不忘
 ## class neighbor:
 ### MAIN VARIABLE
 * link_status: *boolean* decide whether the target router is open.
